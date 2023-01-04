@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using WebApiAutores.Entidades;
 
 namespace WebApiAutores.Controllers
 {
@@ -14,6 +16,37 @@ namespace WebApiAutores.Controllers
 
             this.context= context;
         
+        }
+
+
+
+        //obtener los libros por ID
+
+        [HttpGet("{id:int}")]
+        public async Task<ActionResult<Libro>> Get(int id)
+        {
+
+            return await context.Libros.Include(x=> x.Autor).FirstOrDefaultAsync(x => x.Id == id);
+        }
+
+        //context para agregar ala bd
+        //agregar libros
+
+
+        [HttpPost]
+        public async Task<ActionResult> Post(Libro libro)
+        {
+
+            var existeAutor = await context.Autores.AnyAsync(x => x.Id == libro.AutorId);
+
+            if (!existeAutor)
+            {
+                return BadRequest("No exite el autor al cual le quieres asiganar un libro");
+            }
+            context.Add(libro);
+            await context.SaveChangesAsync();
+            return Ok();
+            
         }
     }
 }
