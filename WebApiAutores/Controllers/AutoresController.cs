@@ -1,6 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection.Metadata.Ecma335;
+using WebApiAutores.DTOs;
 using WebApiAutores.Entidades;
 using WebApiAutores.Servicios;
 
@@ -13,15 +16,13 @@ namespace WebApiAutores.Controllers
     {
         
         private readonly ApplicationDbContext context;
-        private readonly IServicio servicio;
-        private readonly ILogger<AutoresController> logger;
+        private readonly IMapper maper;
 
-        public AutoresController(ApplicationDbContext context, IServicio servicio, ILogger<AutoresController> logger)
+        public AutoresController(ApplicationDbContext context, IMapper maper)
         {
 
             this.context = context;
-            this.servicio = servicio;
-            this.logger = logger;
+            this.maper = maper;
         }
 
 
@@ -34,14 +35,15 @@ namespace WebApiAutores.Controllers
         [HttpGet] //api/autores
         [HttpGet("listado")] // api/autores/listado
         [HttpGet("/listado")] // listado
-        public async Task<List<Autor>> Get()
+        public async Task<List<AutorDTo>> Get()
         {
-            logger.LogInformation("Estiy accediendo a al lista de autores");
-            return  await context.Autores.Include(x=> x.Libros).ToListAsync();
+            var autores =   await context.Autores.ToListAsync();
+            return maper.Map<List<AutorDTo>>(autores);
 
         }
 
-        //obtener el primer autor
+
+        //obtener  autor po id
         [HttpGet("primerId")]
         public async Task<ActionResult<Autor>> primerAutor([FromHeader] int miValor)
         {
@@ -49,21 +51,12 @@ namespace WebApiAutores.Controllers
         }
 
 
-        [HttpGet("primerId2")]
-        public ActionResult<Autor> primerAutor2()
-        {
-            return new Autor()
-            {
-                Nombre="Inventado"
-            };
-        }
-
 
 
 
         //obtener los datos de autores por id 
         [HttpGet("{id:int}")]
-        public async Task<ActionResult<Autor>> Get(int id) 
+        public async Task<ActionResult<AutorDTo>> Get(int id) 
         { 
             var existe =  await context.Autores.FirstOrDefaultAsync(x=> x.Id == id);
             if (existe == null)
@@ -71,23 +64,18 @@ namespace WebApiAutores.Controllers
                 return NotFound();
             }
 
-
-            return existe;
+            return maper.Map<AutorDTo>(existe);
+    
         }
 
 
         //obtener los datos de autores por nombre
         [HttpGet("{nombre}")]
-        public async Task<ActionResult<Autor>> Get([FromRoute] string nombre)
+        public async Task<ActionResult<List<AutorDTo>>> Get([FromRoute] string nombre)
         {
-            var existe = await context.Autores.FirstOrDefaultAsync(x => x.Nombre.Contains(nombre));
-            if (existe == null)
-            {
-                return NotFound();
-            }
+            var existe = await context.Autores.Where(x => x.Nombre.Contains(nombre)).ToListAsync();
 
-
-            return existe;
+            return maper.Map<List<AutorDTo>>(existe);
         }
 
 
@@ -97,16 +85,19 @@ namespace WebApiAutores.Controllers
         //crear una lista de autores
 
         [HttpPost]
-        public async Task<ActionResult> Post([FromBody] Autor autor)
+        public async Task<ActionResult> Post([FromBody] AutorCreacionDTO autorCreacionDto)
         {
 
             //validaciones o reglas contra la BD
-            var existeElAutorConElMismoNombre =  await context.Autores.AnyAsync(x => x.Nombre == autor.Nombre);
+            var existeElAutorConElMismoNombre =  await context.Autores.AnyAsync(x => x.Nombre == autorCreacionDto.Nombre);
 
             if (existeElAutorConElMismoNombre)
             {
-                return BadRequest($"ya existe un autor con el nombre {autor.Nombre}");
+                return BadRequest($"ya existe un autor con el nombre {autorCreacionDto.Nombre}");
             }
+
+            var autor = maper.Map<Autor>(autorCreacionDto);
+            
 
             context.Add(autor);
             await context.SaveChangesAsync();
